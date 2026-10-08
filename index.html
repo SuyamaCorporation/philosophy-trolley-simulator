@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Philosophy Trolley Problem Simulator</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-950 text-white min-h-screen flex flex-col items-center py-8 px-4">
+<div class="max-w-2xl w-full">
+  <h1 class="text-2xl font-bold text-center text-rose-400 mb-1">Trolley Problem Simulator</h1>
+  <p class="text-center text-gray-400 text-sm mb-6">Navigate ethical dilemmas — discover your moral framework</p>
+
+  <div id="intro" class="bg-gray-800 rounded-2xl p-6 text-center">
+    <p class="text-gray-300 mb-4">You'll face a series of ethical dilemmas based on the classic trolley problem. There are no right answers — only choices. Your consistency will be analyzed against philosophical frameworks.</p>
+    <button onclick="startGame()" class="bg-rose-600 hover:bg-rose-500 px-8 py-3 rounded-xl font-semibold text-lg">Begin</button>
+  </div>
+
+  <div id="game" class="hidden">
+    <!-- Progress -->
+    <div class="flex items-center gap-3 mb-4">
+      <div class="flex-1 bg-gray-700 rounded-full h-2">
+        <div id="progress-bar" class="bg-rose-500 h-2 rounded-full transition-all" style="width:0%"></div>
+      </div>
+      <span id="progress-text" class="text-sm text-gray-400 whitespace-nowrap">0 / 12</span>
+    </div>
+
+    <!-- Scenario card -->
+    <div class="bg-gray-800 rounded-2xl p-6 mb-4">
+      <div class="flex items-center gap-2 mb-3">
+        <span id="scenario-num" class="text-xs bg-rose-900 text-rose-300 px-2 py-0.5 rounded-full">Scenario 1</span>
+        <span id="scenario-tag" class="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded-full">Classic</span>
+      </div>
+      <p id="scenario-text" class="text-gray-100 leading-relaxed mb-4 text-base"></p>
+
+      <!-- Visual -->
+      <div id="visual" class="bg-gray-900 rounded-xl p-4 mb-4 font-mono text-xs text-gray-300 whitespace-pre leading-4"></div>
+
+      <div id="options" class="space-y-3"></div>
+    </div>
+
+    <!-- Consequence panel -->
+    <div id="consequence" class="hidden bg-gray-900 border border-gray-700 rounded-2xl p-5 mb-4">
+      <h3 class="font-semibold text-amber-300 mb-2">Consequence</h3>
+      <p id="consequence-text" class="text-gray-300 text-sm mb-3"></p>
+      <div class="text-xs text-gray-500" id="framework-note"></div>
+      <button onclick="nextScenario()" class="mt-3 bg-gray-700 hover:bg-gray-600 px-5 py-2 rounded-lg text-sm">Next Dilemma →</button>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="results" class="hidden bg-gray-800 rounded-2xl p-6">
+    <h2 class="text-xl font-bold text-rose-400 text-center mb-4">Your Moral Profile</h2>
+    <div id="results-content"></div>
+    <button onclick="restartGame()" class="mt-4 w-full bg-rose-600 hover:bg-rose-500 px-5 py-2 rounded-xl">Play Again</button>
+  </div>
+</div>
+
+<script>
+const SCENARIOS = [
+  {
+    id: 'classic', tag: 'Classic', title: 'The Classic Trolley',
+    text: 'A runaway trolley is heading toward 5 workers on the track. You are standing next to a lever. Pulling it will divert the trolley to a side track — but 1 worker is on that track. Do you pull the lever?',
+    visual: '  5 workers    1 worker\n    ↓             ↓\n====●●●●●=====●====\n         ↗\n    🚃→→→\n  (lever here ^)',
+    options: [
+      { text: 'Pull the lever — divert the trolley', value: 'act', utilitarian: true, deontological: false, virtue: 0 },
+      { text: 'Do nothing — let the trolley continue', value: 'noact', utilitarian: false, deontological: true, virtue: 0 }
+    ],
+    consequences: {
+      act: '5 workers are saved. 1 worker is killed. You acted to minimize harm — a utilitarian choice.',
+      noact: 'The trolley kills 5 workers. You refrained from direct action — consistent with deontological "do no harm" principles.'
+    },
+    frameworks: { act: 'Utilitarian: maximized lives saved.', noact: 'Deontological: avoided direct killing.' }
+  },
+  {
+    id: 'footbridge', tag: 'Personal Force', title: 'The Footbridge',
+    text: 'Same trolley, 5 workers in danger. You are on a bridge above the tracks with a large man next to you. Pushing him off the bridge will stop the trolley — he will die, but the 5 will be saved. Do you push him?',
+    visual: '  🧍‍♂️← You  👨← Large man\n       ══════════\n           ↓\n====●●●●●==========\n    🚃→→→',
+    options: [
+      { text: 'Push the man off the bridge', value: 'act', utilitarian: true, deontological: false, virtue: -1 },
+      { text: 'Do not push him', value: 'noact', utilitarian: false, deontological: true, virtue: 1 }
+    ],
+    consequences: {
+      act: 'You saved 5 by using another person as a means to an end. Many find this deeply troubling even if the math is the same as the lever.',
+      noact: 'You refused to use a person as a tool. This reveals a moral distinction between "redirecting harm" vs "using someone as an instrument."'
+    },
+    frameworks: { act: 'Utilitarian: same 5-for-1 calculus. Contradicts classic lever? Note the inconsistency.', noact: 'Kantian: persons are ends, not means.' }
+  },
+  {
+    id: 'loop', tag: 'Loop Track', title: 'The Loop',
+    text: 'The trolley is on a loop track. Pulling the lever sends it down a branch with 1 person — but the branch loops back. The 1 person\'s body will stop the trolley before it reaches the 5. Pull the lever?',
+    visual: '     ╭──●──╮  1 person\n     │      │\n ════╯●●●●● ╰════\n 5 workers    🚃→',
+    options: [
+      { text: 'Pull the lever — use the 1 to stop the trolley', value: 'act', utilitarian: true, deontological: false, virtue: -1 },
+      { text: 'Do not pull — let the trolley reach the 5', value: 'noact', utilitarian: false, deontological: true, virtue: 0 }
+    ],
+    consequences: {
+      act: 'The single person\'s body stops the trolley. This is identical to the footbridge in moral logic — you are using their death as a means.',
+      noact: 'You recognized the loop changes the moral calculation. Pulling would mean using the person instrumentally, not merely redirecting.'
+    },
+    frameworks: { act: 'Reveals tension: you pulled the lever before but the intent is now different.', noact: 'Consistent with double-effect reasoning.' }
+  },
+  {
+    id: 'fat-villain', tag: 'Desert', title: 'The Villain',
+    text: 'Same footbridge scenario — but the large man is someone who deliberately tied the 5 workers to the track. Does that change your decision to push him?',
+    visual: '  🧍‍♂️← You  😈← Villain\n       ══════════\n           ↓\n====●●●●●==========\n    (he tied them)',
+    options: [
+      { text: 'Now push him — he bears moral responsibility', value: 'act', utilitarian: true, deontological: false, virtue: 0 },
+      { text: 'Still won\'t push — killing is wrong regardless', value: 'noact', utilitarian: false, deontological: true, virtue: 0 },
+      { text: 'Push, but purely to save lives, not as punishment', value: 'mixed', utilitarian: true, deontological: false, virtue: 1 }
+    ],
+    consequences: {
+      act: 'Desert-based justice: the villain\'s culpability changes the moral calculus. Retributive reasoning emerges.',
+      noact: 'Absolute prohibition: even a guilty person\'s right to life cannot be violated as a means, regardless of their actions.',
+      mixed: 'You separate the utilitarian act from retributive motivation — a nuanced consequentialist position.'
+    },
+    frameworks: { act: 'Retributive justice: moral desert changes rights.', noact: 'Deontological: absolute right to life.', mixed: 'Consequentialism with motive purity.' }
+  },
+  {
+    id: 'transplant', tag: 'Medical', title: 'The Transplant',
+    text: 'A doctor has 5 patients who will die without organ transplants. One healthy patient has compatible organs for all 5. Should the doctor harvest that patient\'s organs without consent to save the 5?',
+    visual: '  🏥  5 dying patients\n      (need: heart, lungs,\n       liver, kidneys×2)\n\n  💊  1 healthy patient',
+    options: [
+      { text: 'Harvest the organs — 5 lives vs 1', value: 'act', utilitarian: true, deontological: false, virtue: -2 },
+      { text: 'Do not harvest — the healthy patient has rights', value: 'noact', utilitarian: false, deontological: true, virtue: 2 }
+    ],
+    consequences: {
+      act: 'You applied pure utilitarian arithmetic. But this horrifies most people — it would destroy trust in medicine and reduce everyone to potential organ bags.',
+      noact: 'You rejected utilitarian logic when it violated bodily autonomy. Rights, consent, and institutional trust matter beyond the arithmetic.'
+    },
+    frameworks: { act: 'Naive utilitarianism — ignores systemic effects and rights.', noact: 'Rights-based: consent and bodily integrity are inviolable.' }
+  },
+  {
+    id: 'bomb', tag: 'Ticking Bomb', title: 'Ticking Bomb',
+    text: 'A terrorist knows where a bomb is that will kill 1000 people in 1 hour. Torture may make him reveal the location. Torture is normally prohibited. Do you authorize torture?',
+    visual: '  ⏱  60 minutes remaining\n  💣  1000 lives at risk\n  🔒  Suspect in custody\n  ❓  Location unknown',
+    options: [
+      { text: 'Authorize torture — lives outweigh the prohibition', value: 'act', utilitarian: true, deontological: false, virtue: -1 },
+      { text: 'Do not torture — absolute prohibitions exist for reasons', value: 'noact', utilitarian: false, deontological: true, virtue: 1 },
+      { text: 'Torture, but feel genuine moral guilt — a necessary evil', value: 'mixed', utilitarian: true, deontological: false, virtue: 0 }
+    ],
+    consequences: {
+      act: 'You chose consequentialist pragmatism. Critics note: real scenarios are never this clean, and torture produces unreliable information.',
+      noact: 'You maintained the absolute prohibition, aware that permitting exceptions erodes the rule entirely over time.',
+      mixed: 'Bernard Williams called this "moral residue" — doing wrong knowing it is wrong, as evidence you haven\'t lost moral sense.'
+    },
+    frameworks: { act: 'Consequentialism: stakes justify means.', noact: 'Absolute deontology: no exceptions.', mixed: 'Williams\' integrity ethics.' }
+  },
+  {
+    id: 'lifeboat', tag: 'Survival', title: 'The Lifeboat',
+    text: 'A lifeboat holds 10 people but 15 survived the shipwreck. It is sinking. 5 must go overboard or all 15 die. No volunteers. Do you force 5 people off?',
+    visual: '  ⛵ Lifeboat (max 10)\n  👥 15 survivors aboard\n  🌊 All will drown otherwise\n  No volunteers emerging',
+    options: [
+      { text: 'Force 5 off — the math demands it', value: 'act', utilitarian: true, deontological: false, virtue: -1 },
+      { text: 'Do not force anyone — cannot choose who dies', value: 'noact', utilitarian: false, deontological: true, virtue: 0 },
+      { text: 'Draw lots fairly — randomize who must leave', value: 'fair', utilitarian: true, deontological: true, virtue: 1 }
+    ],
+    consequences: {
+      act: 'You made an executive life-or-death decision. The Holmes case (1842) dealt with this exact scenario — crew was convicted.',
+      noact: 'All 15 drown. You refused to assign unilateral death even to save more.',
+      fair: 'Random lottery preserves equal moral worth of lives while accepting that some must go. Rawlsian fairness under a veil of ignorance.'
+    },
+    frameworks: { act: 'Utilitarian arithmetic.', noact: 'Moral paralysis or deontological integrity.', fair: 'Procedural fairness / Rawlsian.' }
+  },
+  {
+    id: 'crying-baby', tag: 'Survival', title: 'The Crying Baby',
+    text: 'You are hiding with a group from soldiers who will kill everyone if discovered. Your baby starts crying, which will reveal your location. Smothering the baby would save the group. Do you smother it?',
+    visual: '  🏚 Hiding location\n  👥 Group of 20 survivors\n  👶 Your crying infant\n  🪖 Soldiers searching nearby',
+    options: [
+      { text: 'Smother the baby — save the 20', value: 'act', utilitarian: true, deontological: false, virtue: -2 },
+      { text: 'Cannot do it — cannot kill your own child', value: 'noact', utilitarian: false, deontological: true, virtue: 0 },
+      { text: 'Let someone else decide — I cannot be the one', value: 'delegate', utilitarian: false, deontological: false, virtue: -1 }
+    ],
+    consequences: {
+      act: 'Extreme utilitarian choice — you overcame the most powerful natural bond. Philosophers debate if this reveals pure rationality or moral bankruptcy.',
+      noact: 'Special obligations to your child overrode general obligations to strangers. Bernard Williams\' "one thought too many" problem.',
+      delegate: 'Delegating doesn\'t absolve responsibility — but reveals how proximity and agent-relative duties affect decision-making.'
+    },
+    frameworks: { act: 'Strict impartialist consequentialism.', noact: 'Agent-relative duties: special obligations to kin.', delegate: 'Moral responsibility diffusion.' }
+  },
+  {
+    id: 'experience-machine', tag: 'Hedonism', title: 'The Experience Machine',
+    text: 'Nozick\'s machine: You can plug into a simulation that will give you the best possible life — indistinguishable from reality. You\'ll feel joy, achievement, love. But it isn\'t real. Do you plug in?',
+    visual: '  🔌 Experience Machine\n  ✨ Perfect simulated life\n  💭 Total subjective happiness\n  ❓ But... none of it is real',
+    options: [
+      { text: 'Plug in — if it feels real, it is real enough', value: 'act', utilitarian: true, deontological: false, virtue: 0 },
+      { text: 'Refuse — what matters is actual reality, not experience', value: 'noact', utilitarian: false, deontological: true, virtue: 1 }
+    ],
+    consequences: {
+      act: 'You are a hedonist in the philosophical sense — experiences are all that matter. Nozick designed this to challenge utilitarian hedonism.',
+      noact: 'You believe in something beyond subjective experience: authentic connection, real achievement, truth. This defeats hedonistic utilitarianism.'
+    },
+    frameworks: { act: 'Hedonistic utilitarianism: experience is all that matters.', noact: 'Objective list theory: real goods matter beyond experience.' }
+  },
+  {
+    id: 'trolley-future', tag: 'Future', title: 'Future Lives',
+    text: 'By sacrificing 1 person today, you can prevent a disease that will kill 1,000,000 people over the next century. The cure requires this one sacrifice. Do you proceed?',
+    visual: '  💉 Medical research\n  1️⃣ One sacrifice required now\n  👥 1,000,000 future lives saved\n  ⏳ Over 100 years',
+    options: [
+      { text: 'Sacrifice the one — a million lives justify it', value: 'act', utilitarian: true, deontological: false, virtue: 0 },
+      { text: 'Refuse — cannot use a person this way regardless', value: 'noact', utilitarian: false, deontological: true, virtue: 1 },
+      { text: 'Depends: did the person consent?', value: 'consent', utilitarian: false, deontological: true, virtue: 2 }
+    ],
+    consequences: {
+      act: 'The utilitarian math is compelling at scale. Peter Singer argues distance in time shouldn\'t reduce our obligation.',
+      noact: 'Deontological: persons cannot be sacrificed even for massive future benefit. Rights are not subject to aggregation.',
+      consent: 'Consent transforms the moral equation entirely. A voluntary sacrifice is a different act than murder.'
+    },
+    frameworks: { act: 'Long-termist effective altruism.', noact: 'Rights are not tradeable against aggregate welfare.', consent: 'Autonomy-respecting consequentialism.' }
+  },
+  {
+    id: 'punishment', tag: 'Justice', title: 'The Scapegoat',
+    text: 'A mob will riot and kill 20 innocent people unless the sheriff executes someone they believe to be guilty. You know the man is innocent. You are the sheriff.',
+    visual: '  ⚖️ Sheriff\'s office\n  👨 1 innocent man in custody\n  👥 Angry mob outside\n  💀 20 will die in riots',
+    options: [
+      { text: 'Execute the innocent man — save the 20', value: 'act', utilitarian: true, deontological: false, virtue: -2 },
+      { text: 'Release him — cannot punish the innocent', value: 'noact', utilitarian: false, deontological: true, virtue: 2 }
+    ],
+    consequences: {
+      act: 'Pure consequentialism. Bernard Williams said this destroys moral integrity — your complicity in injustice corrupts the institution you\'re protecting.',
+      noact: 'Justice requires that punishment tracks guilt. Scapegoating is incompatible with a just legal system, even at cost.'
+    },
+    frameworks: { act: 'Consequentialism: outcomes over process.', noact: 'Retributivism + rule utilitarianism: systemic corruption costs more long-term.' }
+  },
+  {
+    id: 'extinction', tag: 'Existential', title: 'The Last Generation',
+    text: 'You can prevent human extinction at the cost of ensuring no future humans are ever born after the current generation. Same result — no more humans — but one is murder, one is sterility. Which is worse?',
+    visual: '  Option A: Kill all 8B people\n  Option B: Sterilize all 8B\n  Both → no future humans\n  Which is the greater wrong?',
+    options: [
+      { text: 'Option A (killing) is far worse', value: 'kill-worse', utilitarian: false, deontological: true, virtue: 0 },
+      { text: 'Option B (sterilization) is worse — extinction of potential', value: 'steril-worse', utilitarian: true, deontological: false, virtue: 0 },
+      { text: 'Both are equally wrong — same outcome', value: 'equal', utilitarian: true, deontological: false, virtue: 0 }
+    ],
+    consequences: {
+      'kill-worse': 'Most people\'s intuition. But Benatar\'s anti-natalism and Parfit\'s person-affecting views challenge this — non-existence may not be a harm.',
+      'steril-worse': 'You value future potential lives and their interests. This implies obligations to non-existent people — a controversial position.',
+      equal: 'Consequentialist: only outcomes matter, not methods. Parfit explored whether our extinction is even bad if no one exists to be harmed by it.'
+    },
+    frameworks: { 'kill-worse': 'Rights-based: active killing violates rights held now.', 'steril-worse': 'Total view utilitarianism: potential people matter.', equal: 'Outcome equivalence: the method is irrelevant.' }
+  },
+];
+
+let current = 0, choices = [], shuffled = [];
+
+function startGame() {
+  document.getElementById('intro').classList.add('hidden');
+  document.getElementById('game').classList.remove('hidden');
+  shuffled = [...SCENARIOS].sort(() => Math.random() - 0.5).slice(0, 9);
+  current = 0; choices = [];
+  showScenario();
+}
+
+function showScenario() {
+  if (current >= shuffled.length) { showResults(); return; }
+  const s = shuffled[current];
+  document.getElementById('progress-bar').style.width = `${(current/shuffled.length)*100}%`;
+  document.getElementById('progress-text').textContent = `${current} / ${shuffled.length}`;
+  document.getElementById('scenario-num').textContent = `Scenario ${current+1}`;
+  document.getElementById('scenario-tag').textContent = s.tag;
+  document.getElementById('scenario-text').textContent = s.text;
+  document.getElementById('visual').textContent = s.visual;
+  document.getElementById('consequence').classList.add('hidden');
+  const opts = document.getElementById('options');
+  opts.innerHTML = '';
+  s.options.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'w-full text-left bg-gray-700 hover:bg-gray-600 border border-gray-600 hover:border-rose-500 px-4 py-3 rounded-xl text-sm transition-colors';
+    btn.textContent = opt.text;
+    btn.onclick = () => choose(i);
+    opts.appendChild(btn);
+  });
+}
+
+function choose(optIdx) {
+  const s = shuffled[current];
+  const opt = s.options[optIdx];
+  choices.push({ scenario: s.id, choice: opt.value, utilitarian: opt.utilitarian, deontological: opt.deontological, virtue: opt.virtue || 0 });
+
+  document.querySelectorAll('#options button').forEach((b, i) => {
+    b.disabled = true;
+    if (i === optIdx) b.className = b.className.replace('bg-gray-700 hover:bg-gray-600 border-gray-600 hover:border-rose-500','bg-rose-800 border-rose-500');
+  });
+
+  document.getElementById('consequence-text').textContent = s.consequences[opt.value];
+  document.getElementById('framework-note').textContent = '🔍 ' + s.frameworks[opt.value];
+  document.getElementById('consequence').classList.remove('hidden');
+}
+
+function nextScenario() {
+  current++;
+  document.getElementById('consequence').classList.add('hidden');
+  showScenario();
+}
+
+function showResults() {
+  document.getElementById('game').classList.add('hidden');
+  document.getElementById('results').classList.remove('hidden');
+
+  const utilCount = choices.filter(c => c.utilitarian).length;
+  const deoCount = choices.filter(c => c.deontological).length;
+  const virtSum = choices.reduce((s, c) => s + c.virtue, 0);
+  const total = choices.length;
+
+  let primaryFramework = '';
+  if (utilCount > deoCount * 1.5) primaryFramework = '⚖️ Utilitarian — outcomes matter most';
+  else if (deoCount > utilCount * 1.5) primaryFramework = '📜 Deontological — rules and rights first';
+  else primaryFramework = '⚡ Mixed — context-sensitive moral reasoning';
+
+  let virtueNote = virtSum >= 3 ? 'Your choices reflect strong virtue ethics alignment — character and integrity guide your decisions.' :
+    virtSum <= -2 ? 'Your choices at times overrode character considerations for utilitarian outcomes.' :
+    'Moderate virtue ethics signal — some agent-relative reasoning present.';
+
+  const inconsistencies = [];
+  const leverChoice = choices.find(c => c.scenario === 'classic');
+  const footChoice = choices.find(c => c.scenario === 'footbridge');
+  if (leverChoice?.choice === 'act' && footChoice?.choice === 'noact') inconsistencies.push('You pulled the lever but not the footbridge push — suggesting "redirection" vs "using" as a moral distinction.');
+  if (leverChoice?.choice === 'noact' && footChoice?.choice === 'act') inconsistencies.push('You pushed from the bridge but not pull the lever — an unusual ordering worth reflecting on.');
+
+  const html = `
+    <div class="space-y-4">
+      <div class="bg-gray-700 rounded-xl p-4">
+        <div class="text-sm text-gray-400 mb-1">Primary Framework</div>
+        <div class="text-lg font-bold text-rose-300">${primaryFramework}</div>
+      </div>
+      <div class="grid grid-cols-3 gap-3 text-center text-sm">
+        <div class="bg-gray-700 rounded-xl p-3">
+          <div class="text-2xl font-bold text-amber-400">${utilCount}/${total}</div>
+          <div class="text-gray-400 text-xs mt-1">Utilitarian choices</div>
+        </div>
+        <div class="bg-gray-700 rounded-xl p-3">
+          <div class="text-2xl font-bold text-blue-400">${deoCount}/${total}</div>
+          <div class="text-gray-400 text-xs mt-1">Deontological choices</div>
+        </div>
+        <div class="bg-gray-700 rounded-xl p-3">
+          <div class="text-2xl font-bold ${virtSum >= 0 ? 'text-green-400' : 'text-red-400'}">${virtSum > 0 ? '+' : ''}${virtSum}</div>
+          <div class="text-gray-400 text-xs mt-1">Virtue score</div>
+        </div>
+      </div>
+      <div class="bg-gray-700 rounded-xl p-4 text-sm text-gray-300">${virtueNote}</div>
+      ${inconsistencies.length > 0 ? `<div class="bg-amber-900/30 border border-amber-700 rounded-xl p-4">
+        <div class="font-semibold text-amber-300 mb-2">Interesting Inconsistencies</div>
+        ${inconsistencies.map(i => `<p class="text-sm text-gray-300 mb-1">• ${i}</p>`).join('')}
+        <p class="text-xs text-gray-400 mt-2">Inconsistencies aren't failures — they reveal the nuanced moral intuitions that philosophers have debated for centuries.</p>
+      </div>` : '<div class="bg-gray-700 rounded-xl p-3 text-sm text-gray-300 text-center">No notable inconsistencies detected — your framework is coherent.</div>'}
+    </div>
+  `;
+  document.getElementById('results-content').innerHTML = html;
+}
+
+function restartGame() {
+  document.getElementById('results').classList.add('hidden');
+  startGame();
+}
+</script>
+</body>
+</html>
